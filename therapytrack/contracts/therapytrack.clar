@@ -77,3 +77,54 @@
 (define-data-var next-goal-id uint u1)
 
 (define-constant contract-owner tx-sender)
+
+(define-public (register-therapist
+  (therapist-id principal)
+  (license-number (string-ascii 50))
+  (specialization (string-ascii 100))
+  (session-capacity uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) ERR_NOT_AUTHORIZED)
+    (map-set therapist-profiles
+      { therapist-id: therapist-id }
+      {
+        license-number: license-number,
+        specialization: specialization,
+        certification-date: block-height,
+        session-capacity: session-capacity,
+        current-patients: u0,
+        rating-score: u80,
+        is-verified: true
+      }
+    )
+    (ok true)
+  )
+)
+
+(define-public (register-patient
+  (patient-id principal)
+  (age-group (string-ascii 20))
+  (therapy-type (string-ascii 50))
+  (assigned-therapist principal))
+  (let ((therapist-data (unwrap! (map-get? therapist-profiles { therapist-id: assigned-therapist }) ERR_INVALID_THERAPIST)))
+    (asserts! (is-eq tx-sender contract-owner) ERR_NOT_AUTHORIZED)
+    (asserts! (get is-verified therapist-data) ERR_INVALID_THERAPIST)
+    (map-set patient-records
+      { patient-id: patient-id }
+      {
+        registration-date: block-height,
+        age-group: age-group,
+        therapy-type: therapy-type,
+        assigned-therapist: assigned-therapist,
+        session-count: u0,
+        last-session: u0,
+        is-active: true
+      }
+    )
+    (map-set therapist-profiles
+      { therapist-id: assigned-therapist }
+      (merge therapist-data { current-patients: (+ (get current-patients therapist-data) u1) })
+    )
+    (ok true)
+  )
+)
