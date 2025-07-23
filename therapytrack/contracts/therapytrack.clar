@@ -128,3 +128,92 @@
     (ok true)
   )
 )
+
+(define-public (schedule-session
+  (patient-id principal)
+  (session-date uint)
+  (duration-minutes uint)
+  (session-type (string-ascii 30)))
+  (let ((session-id (var-get next-session-id))
+        (patient-data (unwrap! (map-get? patient-records { patient-id: patient-id }) ERR_INVALID_PATIENT))
+        (therapist-id (get assigned-therapist patient-data)))
+    (asserts! (or (is-eq tx-sender patient-id) (is-eq tx-sender therapist-id)) ERR_NOT_AUTHORIZED)
+    (asserts! (get is-active patient-data) ERR_INVALID_PATIENT)
+    (map-set therapy-sessions
+      { session-id: session-id }
+      {
+        patient-id: patient-id,
+        therapist-id: therapist-id,
+        session-date: session-date,
+        duration-minutes: duration-minutes,
+        session-type: session-type,
+        notes-hash: 0x00,
+        mood-before: u5,
+        mood-after: u5,
+        homework-assigned: false,
+        next-session-scheduled: u0,
+        status: "scheduled"
+      }
+    )
+    (var-set next-session-id (+ session-id u1))
+    (ok session-id)
+  )
+)
+
+(define-public (complete-session
+  (session-id uint)
+  (notes-hash (buff 32))
+  (mood-before uint)
+  (mood-after uint)
+  (homework-assigned bool)
+  (next-session-date uint))
+  (let ((session-data (unwrap! (map-get? therapy-sessions { session-id: session-id }) ERR_SESSION_NOT_FOUND))
+        (patient-id (get patient-id session-data))
+        (patient-data (unwrap! (map-get? patient-records { patient-id: patient-id }) ERR_INVALID_PATIENT)))
+    (asserts! (is-eq tx-sender (get therapist-id session-data)) ERR_NOT_AUTHORIZED)
+    (asserts! (is-eq (get status session-data) "scheduled") ERR_NOT_AUTHORIZED)
+    (map-set therapy-sessions
+      { session-id: session-id }
+      (merge session-data {
+        notes-hash: notes-hash,
+        mood-before: mood-before,
+        mood-after: mood-after,
+        homework-assigned: homework-assigned,
+        next-session-scheduled: next-session-date,
+        status: "completed"
+      })
+    )
+    (map-set patient-records
+      { patient-id: patient-id }
+      (merge patient-data {
+        session-count: (+ (get session-count patient-data) u1),
+        last-session: block-height
+      })
+    )
+    (ok true)
+  )
+)
+
+(define-public (record-session-outcome
+  (session-id uint)
+  (progress-rating uint)
+  (goals-achieved (string-ascii 200))
+  (challenges-identified (string-ascii 200))
+  (treatment-adjustments (string-ascii 200))
+  (follow-up-required bool))
+  (let ((session-data (unwrap! (map-get? therapy-sessions { session-id: session-id }) ERR_SESSION_NOT_FOUND)))
+    (asserts! (is-eq tx-sender (get therapist-id session-data)) ERR_NOT_AUTHORIZED)
+    (asserts! (is-eq (get status session-data) "completed") ERR_NOT_AUTHORIZED)
+    (map-set session-outcomes
+      { session-id: session-id }
+      {
+        progress-rating: progress-rating,
+        goals-achieved: goals-achieved,
+        challenges-identified: challenges-identified,
+        treatment-adjustments: treatment-adjustments,
+        follow-up-required: follow-up-required
+      }
+    )
+    (ok true)
+  )
+)
