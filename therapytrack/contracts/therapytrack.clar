@@ -217,3 +217,73 @@
     (ok true)
   )
 )
+
+(define-public (create-therapy-goal
+  (patient-id principal)
+  (goal-description (string-ascii 200))
+  (target-date uint))
+  (let ((goal-id (var-get next-goal-id))
+        (patient-data (unwrap! (map-get? patient-records { patient-id: patient-id }) ERR_INVALID_PATIENT)))
+    (asserts! (is-eq tx-sender (get assigned-therapist patient-data)) ERR_NOT_AUTHORIZED)
+    (map-set therapy-goals
+      { patient-id: patient-id, goal-id: goal-id }
+      {
+        goal-description: goal-description,
+        target-date: target-date,
+        progress-percentage: u0,
+        status: "active",
+        created-by: tx-sender,
+        last-updated: block-height
+      }
+    )
+    (var-set next-goal-id (+ goal-id u1))
+    (ok goal-id)
+  )
+)
+
+(define-public (update-goal-progress
+  (patient-id principal)
+  (goal-id uint)
+  (progress-percentage uint))
+  (let ((goal-data (unwrap! (map-get? therapy-goals { patient-id: patient-id, goal-id: goal-id }) ERR_SESSION_NOT_FOUND))
+        (patient-data (unwrap! (map-get? patient-records { patient-id: patient-id }) ERR_INVALID_PATIENT)))
+    (asserts! (is-eq tx-sender (get assigned-therapist patient-data)) ERR_NOT_AUTHORIZED)
+    (map-set therapy-goals
+      { patient-id: patient-id, goal-id: goal-id }
+      (merge goal-data {
+        progress-percentage: progress-percentage,
+        status: (if (>= progress-percentage u100) "completed" "active"),
+        last-updated: block-height
+      })
+    )
+    (ok true)
+  )
+)
+
+(define-read-only (get-patient-record (patient-id principal))
+  (map-get? patient-records { patient-id: patient-id })
+)
+
+(define-read-only (get-therapist-profile (therapist-id principal))
+  (map-get? therapist-profiles { therapist-id: therapist-id })
+)
+
+(define-read-only (get-therapy-session (session-id uint))
+  (map-get? therapy-sessions { session-id: session-id })
+)
+
+(define-read-only (get-session-outcome (session-id uint))
+  (map-get? session-outcomes { session-id: session-id })
+)
+
+(define-read-only (get-therapy-goal (patient-id principal) (goal-id uint))
+  (map-get? therapy-goals { patient-id: patient-id, goal-id: goal-id })
+)
+
+(define-read-only (get-next-session-id)
+  (var-get next-session-id)
+)
+
+(define-read-only (get-next-goal-id)
+  (var-get next-goal-id)
+)
