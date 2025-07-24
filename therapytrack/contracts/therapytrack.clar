@@ -76,8 +76,6 @@
 (define-data-var next-session-id uint u1)
 (define-data-var next-goal-id uint u1)
 
-(define-constant contract-owner tx-sender)
-
 (define-public (register-therapist
   (therapist-id principal)
   (license-number (string-ascii 50))
@@ -90,7 +88,7 @@
       {
         license-number: license-number,
         specialization: specialization,
-        certification-date: block-height,
+        certification-date: stacks-block-height,
         session-capacity: session-capacity,
         current-patients: u0,
         rating-score: u80,
@@ -112,7 +110,7 @@
     (map-set patient-records
       { patient-id: patient-id }
       {
-        registration-date: block-height,
+        registration-date: stacks-block-height,
         age-group: age-group,
         therapy-type: therapy-type,
         assigned-therapist: assigned-therapist,
@@ -187,7 +185,7 @@
       { patient-id: patient-id }
       (merge patient-data {
         session-count: (+ (get session-count patient-data) u1),
-        last-session: block-height
+        last-session: stacks-block-height
       })
     )
     (ok true)
@@ -233,7 +231,7 @@
         progress-percentage: u0,
         status: "active",
         created-by: tx-sender,
-        last-updated: block-height
+        last-updated: stacks-block-height
       }
     )
     (var-set next-goal-id (+ goal-id u1))
@@ -253,7 +251,7 @@
       (merge goal-data {
         progress-percentage: progress-percentage,
         status: (if (>= progress-percentage u100) "completed" "active"),
-        last-updated: block-height
+        last-updated: stacks-block-height
       })
     )
     (ok true)
@@ -287,3 +285,5 @@
 (define-read-only (get-next-goal-id)
   (var-get next-goal-id)
 )
+
+(define-constant contract-owner tx-sender)
